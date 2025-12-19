@@ -1,10 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { 
-    getFirestore, collection, doc, setDoc, addDoc, 
-    serverTimestamp, onSnapshot 
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// 1. КОНФІГУРАЦІЯ FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyBsAur0eQCEn6H127HBJZgPm5wklMHGNQc",
   authDomain: "barmen-app.firebaseapp.com",
@@ -17,7 +13,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 2. ПОВНИЙ КАТАЛОГ З ВАШОГО ФОТО
 const PRODUCT_CATALOG = [
     { id: "2204218200", name: "вино Дон Сімон Кабарне", unit: "л" },
     { id: "2204218100", name: "Вино ДС біле Савіньйон бланк", unit: "л" },
@@ -27,82 +22,82 @@ const PRODUCT_CATALOG = [
     { id: "2203001000", name: "пиво Варштайнер", unit: "л" },
     { id: "2208201200", name: "коньяк Закарпатський 4*", unit: "л" },
     { id: "2203001000_1", name: "пиво КРОНЕНБУРГ", unit: "л" },
-    { id: "2208701000_1", name: "Лікер Вишн спок смор", unit: "л" },
     { id: "2204109800", name: "шампанське Маренго Брют", unit: "шт" },
-    { id: "2202991900_1", name: "Шамп безалк. біле", unit: "шт" },
-    { id: "2208906900", name: "ром Кептен Морган спайсед", unit: "л" },
     { id: "2208308200", name: "віскі Джеймісон", unit: "л" },
-    { id: "2203000900", name: "Пиво Будвайзер", unit: "шт" },
-    { id: "2203000900_1", name: "пиво Гамбрінус", unit: "шт" }
+    { id: "2203000900", name: "Пиво Будвайзер", unit: "шт" }
 ];
 
-// Локальна копія залишків з бази
 let currentBalances = {};
 
-// 3. ГОЛОВНА ФУНКЦІЯ: З'єднуємо Каталог і Базу
+// СЛУХАЧ БАЗИ
 onSnapshot(collection(db, "inventory"), (snapshot) => {
-    // Оновлюємо локальну копію залишків
     currentBalances = {};
-    snapshot.forEach(doc => {
-        currentBalances[doc.id] = doc.data().amount;
-    });
+    snapshot.forEach(doc => { currentBalances[doc.id] = doc.data().amount; });
 
-    // Формуємо фінальний список для відображення
     const displayList = PRODUCT_CATALOG.map(item => ({
         ...item,
-        amount: currentBalances[item.id] || 0 // Якщо в базі немає — залишок 0
+        amount: currentBalances[item.id] || 0
     }));
-
     renderTable(displayList);
 });
 
 function renderTable(items) {
     const tbody = document.getElementById('inventory-body');
+    if (!tbody) return;
     tbody.innerHTML = '';
-
     items.forEach(item => {
         const isBeer = item.name.toLowerCase().includes('пиво') && item.unit === 'л';
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="id-cell">${item.id}</td>
-            <td><strong>${item.name}</strong></td>
-            <td class="balance-cell">${item.amount.toFixed(3)} ${item.unit}</td>
-            <td class="actions">
-                <div class="sale-box">
-                    <input type="number" id="input-${item.id}" step="0.001" 
-                           placeholder="${isBeer ? 'Порції' : 'К-сть'}" class="qty-input">
-                    <button class="btn-sale" onclick="window.processSale('${item.id}', ${isBeer})">Вибити</button>
-                </div>
-                <button class="btn-restock" onclick="window.handleRestock('${item.id}')">Поставка</button>
-            </td>
-        `;
-        tbody.appendChild(row);
+        const row = `
+            <tr>
+                <td>${item.id}</td>
+                <td><strong>${item.name}</strong></td>
+                <td>${item.amount.toFixed(3)} ${item.unit}</td>
+                <td>
+                    <input type="number" id="input-${item.id}" placeholder="${isBeer ? 'Порції' : 'К-сть'}" style="width:60px">
+                    <button onclick="window.processSale('${item.id}', ${isBeer})" style="background:red; color:white">Вибити</button>
+                    <button onclick="window.handleRestock('${item.id}')" style="background:green; color:white">Поставка</button>
+                </td>
+            </tr>`;
+        tbody.insertAdjacentHTML('beforeend', row);
     });
 }
 
-// 4. ПРОДАЖ (СПИСАННЯ)
+// ПРИВ'ЯЗКА ДО WINDOW (ОБОВ'ЯЗКОВО)
 window.processSale = async (id, isBeer) => {
-    const input = document.getElementById(`input-${id}`);
-    const qty = parseFloat(input.value);
-
-    if (!qty || qty <= 0) return alert("Введіть кількість");
-
-    const change = isBeer ? -(qty * 0.4) : -qty;
-    const currentVal = currentBalances[id] || 0;
-    const newTotal = currentVal + change;
-
-    if (newTotal < 0) return alert("Недостатньо залишку!");
-
-    await saveToDb(id, newTotal, change, 'sale');
-    input.value = '';
+    const val = document.getElementById(`input-${id}`).value;
+    if (!val) return alert("Введіть число");
+    const change = isBeer ? -(parseFloat(val) * 0.4) : -parseFloat(val);
+    await updateBalance(id, change, 'sale');
+    document.getElementById(`input-${id}`).value = '';
 };
 
-// 5. ПОСТАВКА (ДОДАВАННЯ)
 window.handleRestock = async (id) => {
-    const val = prompt("Скільки прийшло товару?");
-    if (!val || isNaN(val)) return;
+    const val = prompt("Кількість поставки:");
+    if (val) await updateBalance(id, parseFloat(val), 'restock');
+};
 
+async function updateBalance(id, change, type) {
+    const current = currentBalances[id] || 0;
+    const newTotal = current + change;
+    const prod = PRODUCT_CATALOG.find(p => p.id === id);
+
+    try {
+        await setDoc(doc(db, "inventory", id), {
+            name: prod.name,
+            unit: prod.unit,
+            amount: newTotal
+        });
+        await addDoc(collection(db, "history"), {
+            positionId: id,
+            change: change,
+            type: type,
+            time: serverTimestamp()
+        });
+    } catch (e) {
+        console.error("Помилка запису:", e);
+        alert("Помилка доступу до бази!");
+    }
+}
     const addAmount = parseFloat(val);
     const currentVal = currentBalances[id] || 0;
     const newTotal = currentVal + addAmount;
