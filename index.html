@@ -18,15 +18,16 @@
             <details>
                 <summary>➕ Додати позицію або Поставку</summary>
                 <form id="add-form">
-                    <input id="new-id" type="text" placeholder="Код позиції" required>
-                    <input id="new-name" type="text" placeholder="Назва напою" required>
-                    <select id="new-unit">
-                        <option value="л">Літри (л)</option>
-                        <option value="шт">Штуки (шт)</option>
-                    </select>
-                    <input id="new-amount" type="number" step="0.001" placeholder="Кількість" required>
-                    <button type="submit" id="save-btn">Зберегти</button>
-                </form>
+    <select id="new-name-select" required>
+        <option value="" disabled selected>Оберіть позицію...</option>
+        </select>
+    
+    <input id="new-id" type="text" placeholder="Код (авто)" readonly> 
+    <input id="new-unit" type="text" placeholder="Од. вим. (авто)" readonly>
+    
+    <input id="new-amount" type="number" step="0.001" placeholder="Кількість для додавання" required>
+    <button type="submit" id="save-btn">Оформити поставку</button>
+</form>
             </details>
         </section>
 
