@@ -111,3 +111,30 @@ input[readonly] {
     font-weight: bold;
     border: 2px solid #3498db;
 }
+.reports-container {
+    margin-top: 40px;
+    padding: 20px;
+    background: #fff;
+    border: 2px solid #3498db;
+    border-radius: 12px;
+}
+
+.report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.report-table th {
+    background-color: #34495e;
+}
+
+.hidden { display: none; }
+
+#report-date-picker {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
