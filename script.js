@@ -20,12 +20,15 @@ const db = getFirestore(app);
 document.getElementById('current-date').innerText = new Date().toLocaleDateString('uk-UA');
 
 // Функція для відмальовування таблиці
+// ... (Ваш каталог PRODUCT_CATALOG та ініціалізація Firebase залишаються)
+
 function renderTable(items) {
     const tbody = document.getElementById('inventory-body');
     tbody.innerHTML = '';
 
     items.forEach(item => {
-        const isBeer = item.name.toLowerCase().includes('пиво') && item.unit === 'л';
+        // Перевірка, чи це розливне пиво (літри)
+        const isBeerLiters = item.name.toLowerCase().includes('пиво') && item.unit === 'л';
         
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -33,14 +36,46 @@ function renderTable(items) {
             <td><strong>${item.name}</strong></td>
             <td style="text-align: center;">${item.amount.toFixed(3)} ${item.unit}</td>
             <td style="text-align: right;">
-                <button class="btn-sale" onclick="window.handleAction('${item.id}', -0.05, 'sale')">-50г</button>
-                ${isBeer ? `<button class="btn-sale btn-beer" onclick="window.handleAction('${item.id}', -0.4, 'sale')">-0.4л</button>` : ''}
+                <div class="sale-group">
+                    <input type="number" id="input-${item.id}" 
+                           step="${isBeerLiters ? '1' : '0.001'}" 
+                           placeholder="${isBeerLiters ? 'Порції' : (item.unit === 'л' ? 'Літри' : 'Шт')}" 
+                           class="qty-input">
+                    <button class="btn-sale-action" onclick="window.processSale('${item.id}', ${isBeerLiters})">Вибити</button>
+                </div>
                 <button class="btn-restock" onclick="window.handleRestock('${item.id}')">Поставка</button>
             </td>
         `;
         tbody.appendChild(row);
     });
 }
+
+// Нова функція для обробки продажу
+window.processSale = async (id, isBeer) => {
+    const input = document.getElementById(`input-${id}`);
+    const value = parseFloat(input.value);
+
+    if (!value || value <= 0) {
+        alert("Будь ласка, введіть коректну кількість");
+        return;
+    }
+
+    let changeAmount;
+    if (isBeer) {
+        // Якщо пиво — множимо кількість порцій на 0.4л
+        changeAmount = -(value * 0.4);
+    } else {
+        // Для інших — віднімаємо введене значення (літри або штуки)
+        changeAmount = -value;
+    }
+
+    // Викликаємо існуючу функцію handleAction
+    await window.handleAction(id, changeAmount, 'sale');
+    
+    // Очищаємо поле після успішної операції
+    input.value = '';
+};
+
 
 // Слухач бази даних (оновлюється миттєво при змінах)
 onSnapshot(collection(db, "inventory"), (snapshot) => {
