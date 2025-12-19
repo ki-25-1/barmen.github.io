@@ -91,20 +91,71 @@ onSnapshot(collection(db, "inventory"), (snapshot) => {
     });
 });
 
-// Додавання нової позиції через форму
+
+// ... (Ваш конфіг Firebase залишається без змін)
+
+// БАЗА ДАНИХ З ВАШОГО ФОТО
+const PRODUCT_CATALOG = [
+    { id: "2204218200", name: "вино Дон Сімон Кабарне", unit: "л" },
+    { id: "2204218100", name: "Вино ДС біле Савіньйон бланк", unit: "л" },
+    { id: "2208701000", name: "Лікер Вишнева спокуса", unit: "л" },
+    { id: "2202991900", name: "Вино безалк. червоне біле", unit: "л" },
+    { id: "2208601100", name: "горілка Козацька Рада", unit: "л" },
+    { id: "2203001000", name: "пиво Варштайнер", unit: "л" },
+    { id: "2208201200", name: "коньяк Закарпатський 4*", unit: "л" },
+    { id: "2203001000_1", name: "пиво КРОНЕНБУРГ", unit: "л" },
+    { id: "2208701000_1", name: "Лікер Вишн спок смор", unit: "л" },
+    { id: "2204109800", name: "шампанське Маренго Брют", unit: "шт" },
+    { id: "2202991900_1", name: "Шамп безалк. біле", unit: "шт" },
+    { id: "2208906900", name: "ром Кептен Морган спайсед", unit: "л" },
+    { id: "2208308200", name: "віскі Джеймісон", unit: "л" },
+    { id: "2203000900", name: "Пиво Будвайзер", unit: "шт" },
+    { id: "2203000900_1", name: "пиво Гамбрінус", unit: "шт" }
+];
+
+// 1. Заповнюємо випадаючий список при завантаженні
+const nameSelect = document.getElementById('new-name-select');
+PRODUCT_CATALOG.forEach(item => {
+    let opt = document.createElement('option');
+    opt.value = item.id; // зберігаємо ID як значення
+    opt.innerHTML = item.name;
+    nameSelect.appendChild(opt);
+});
+
+// 2. АВТОПІДБІР: Слухаємо зміну вибору у списку
+nameSelect.addEventListener('change', (e) => {
+    const selectedId = e.target.value;
+    const product = PRODUCT_CATALOG.find(p => p.id === selectedId);
+
+    if (product) {
+        document.getElementById('new-id').value = product.id;
+        document.getElementById('new-unit').value = product.unit;
+    }
+});
+
+// 3. Збереження поставки (оновлений обробник форми)
 document.getElementById('add-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    
     const id = document.getElementById('new-id').value;
-    const name = document.getElementById('new-name').value;
+    const name = nameSelect.options[nameSelect.selectedIndex].text;
     const unit = document.getElementById('new-unit').value;
-    const amount = parseFloat(document.getElementById('new-amount').value);
+    const addAmount = parseFloat(document.getElementById('new-amount').value);
+
+    // Отримуємо поточний залишок з бази або 0
+    const currentVal = window.currentData[id] || 0;
+    const newTotal = currentVal + addAmount;
 
     await setDoc(doc(db, "inventory", id), {
         name: name,
         unit: unit,
-        amount: amount
-    });
+        amount: newTotal
+    }, { merge: true });
 
+    alert(`Додано ${addAmount} до ${name}`);
     e.target.reset();
 });
+
+// ... (інший код handleAction та onSnapshot залишається)
+
       
