@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Барний Облік</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Система Списання Бару</h1>
+            <p id="current-date"></p>
+        </header>
+
+        <section class="admin-panel">
+            <details>
+                <summary>➕ Додати позицію або Поставку</summary>
+                <form id="add-form">
+                    <input id="new-id" type="text" placeholder="Код позиції" required>
+                    <input id="new-name" type="text" placeholder="Назва напою" required>
+                    <select id="new-unit">
+                        <option value="л">Літри (л)</option>
+                        <option value="шт">Штуки (шт)</option>
+                    </select>
+                    <input id="new-amount" type="number" step="0.001" placeholder="Кількість" required>
+                    <button type="submit" id="save-btn">Зберегти</button>
+                </form>
+            </details>
+        </section>
+
+        <main class="inventory">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Код</th>
+                        <th>Найменування</th>
+                        <th>Залишок</th>
+                        <th class="actions-header">Дії</th>
+                    </tr>
+                </thead>
+                <tbody id="inventory-body">
+                    </tbody>
+            </table>
+        </main>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
