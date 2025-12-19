@@ -1,10 +1,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
-    getFirestore, collection, doc, setDoc, updateDoc, 
-    addDoc, serverTimestamp, onSnapshot 
+    getFirestore, collection, doc, setDoc, addDoc, 
+    serverTimestamp, onSnapshot 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// КОНФІГУРАЦІЯ FIREBASE (Вставте свої дані тут)
+// 1. КОНФІГУРАЦІЯ FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyBsAur0eQCEn6H127HBJZgPm5wklMHGNQc",
   authDomain: "barmen-app.firebaseapp.com",
@@ -13,35 +13,66 @@ const firebaseConfig = {
   messagingSenderId: "173684350688",
   appId: "1:173684350688:web:6a921f6e067c32402afa85"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Відображення поточної дати
-document.getElementById('current-date').innerText = new Date().toLocaleDateString('uk-UA');
+// 2. ПОВНИЙ КАТАЛОГ З ВАШОГО ФОТО
+const PRODUCT_CATALOG = [
+    { id: "2204218200", name: "вино Дон Сімон Кабарне", unit: "л" },
+    { id: "2204218100", name: "Вино ДС біле Савіньйон бланк", unit: "л" },
+    { id: "2208701000", name: "Лікер Вишнева спокуса", unit: "л" },
+    { id: "2202991900", name: "Вино безалк. червоне біле", unit: "л" },
+    { id: "2208601100", name: "горілка Козацька Рада", unit: "л" },
+    { id: "2203001000", name: "пиво Варштайнер", unit: "л" },
+    { id: "2208201200", name: "коньяк Закарпатський 4*", unit: "л" },
+    { id: "2203001000_1", name: "пиво КРОНЕНБУРГ", unit: "л" },
+    { id: "2208701000_1", name: "Лікер Вишн спок смор", unit: "л" },
+    { id: "2204109800", name: "шампанське Маренго Брют", unit: "шт" },
+    { id: "2202991900_1", name: "Шамп безалк. біле", unit: "шт" },
+    { id: "2208906900", name: "ром Кептен Морган спайсед", unit: "л" },
+    { id: "2208308200", name: "віскі Джеймісон", unit: "л" },
+    { id: "2203000900", name: "Пиво Будвайзер", unit: "шт" },
+    { id: "2203000900_1", name: "пиво Гамбрінус", unit: "шт" }
+];
 
-// Функція для відмальовування таблиці
-// ... (Ваш каталог PRODUCT_CATALOG та ініціалізація Firebase залишаються)
+// Локальна копія залишків з бази
+let currentBalances = {};
+
+// 3. ГОЛОВНА ФУНКЦІЯ: З'єднуємо Каталог і Базу
+onSnapshot(collection(db, "inventory"), (snapshot) => {
+    // Оновлюємо локальну копію залишків
+    currentBalances = {};
+    snapshot.forEach(doc => {
+        currentBalances[doc.id] = doc.data().amount;
+    });
+
+    // Формуємо фінальний список для відображення
+    const displayList = PRODUCT_CATALOG.map(item => ({
+        ...item,
+        amount: currentBalances[item.id] || 0 // Якщо в базі немає — залишок 0
+    }));
+
+    renderTable(displayList);
+});
 
 function renderTable(items) {
     const tbody = document.getElementById('inventory-body');
     tbody.innerHTML = '';
 
     items.forEach(item => {
-        // Перевірка, чи це розливне пиво (літри)
-        const isBeerLiters = item.name.toLowerCase().includes('пиво') && item.unit === 'л';
+        const isBeer = item.name.toLowerCase().includes('пиво') && item.unit === 'л';
         
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td style="font-size: 0.8em; color: #7f8c8d;">${item.id}</td>
+            <td class="id-cell">${item.id}</td>
             <td><strong>${item.name}</strong></td>
-            <td style="text-align: center;">${item.amount.toFixed(3)} ${item.unit}</td>
-            <td style="text-align: right;">
-                <div class="sale-group">
-                    <input type="number" id="input-${item.id}" 
-                           step="${isBeerLiters ? '1' : '0.001'}" 
-                           placeholder="${isBeerLiters ? 'Порції' : (item.unit === 'л' ? 'Літри' : 'Шт')}" 
-                           class="qty-input">
-                    <button class="btn-sale-action" onclick="window.processSale('${item.id}', ${isBeerLiters})">Вибити</button>
+            <td class="balance-cell">${item.amount.toFixed(3)} ${item.unit}</td>
+            <td class="actions">
+                <div class="sale-box">
+                    <input type="number" id="input-${item.id}" step="0.001" 
+                           placeholder="${isBeer ? 'Порції' : 'К-сть'}" class="qty-input">
+                    <button class="btn-sale" onclick="window.processSale('${item.id}', ${isBeer})">Вибити</button>
                 </div>
                 <button class="btn-restock" onclick="window.handleRestock('${item.id}')">Поставка</button>
             </td>
@@ -50,59 +81,65 @@ function renderTable(items) {
     });
 }
 
-// Нова функція для обробки продажу
+// 4. ПРОДАЖ (СПИСАННЯ)
 window.processSale = async (id, isBeer) => {
     const input = document.getElementById(`input-${id}`);
-    const value = parseFloat(input.value);
+    const qty = parseFloat(input.value);
 
-    if (!value || value <= 0) {
-        alert("Будь ласка, введіть коректну кількість");
-        return;
-    }
+    if (!qty || qty <= 0) return alert("Введіть кількість");
 
-    let changeAmount;
-    if (isBeer) {
-        // Якщо пиво — множимо кількість порцій на 0.4л
-        changeAmount = -(value * 0.4);
-    } else {
-        // Для інших — віднімаємо введене значення (літри або штуки)
-        changeAmount = -value;
-    }
+    const change = isBeer ? -(qty * 0.4) : -qty;
+    const currentVal = currentBalances[id] || 0;
+    const newTotal = currentVal + change;
 
-    // Викликаємо існуючу функцію handleAction
-    await window.handleAction(id, changeAmount, 'sale');
-    
-    // Очищаємо поле після успішної операції
+    if (newTotal < 0) return alert("Недостатньо залишку!");
+
+    await saveToDb(id, newTotal, change, 'sale');
     input.value = '';
 };
 
+// 5. ПОСТАВКА (ДОДАВАННЯ)
+window.handleRestock = async (id) => {
+    const val = prompt("Скільки прийшло товару?");
+    if (!val || isNaN(val)) return;
 
-// Слухач бази даних (оновлюється миттєво при змінах)
-onSnapshot(collection(db, "inventory"), (snapshot) => {
-    const items = [];
-    snapshot.forEach(doc => {
-        items.push({ ...doc.data(), id: doc.id });
-    });
-    renderTable(items);
-});
+    const addAmount = parseFloat(val);
+    const currentVal = currentBalances[id] || 0;
+    const newTotal = currentVal + addAmount;
 
-// Функція обробки натискань (Списання)
-window.handleAction = async (id, change, type) => {
-    const itemRef = doc(db, "inventory", id);
+    await saveToDb(id, newTotal, addAmount, 'restock');
+};
+
+// 6. УНІВЕРСАЛЬНА ФУНКЦІЯ ЗБЕРЕЖЕННЯ
+async function saveToDb(id, newTotal, change, type) {
+    const product = PRODUCT_CATALOG.find(p => p.id === id);
     
-    // Знаходимо поточний об'єкт у локальному списку для перевірки залишку
-    // В реальному проекті краще робити транзакцію Firestore
-    const newAmount = window.currentData[id] + change;
+    // Оновлюємо залишок в основній таблиці
+    await setDoc(doc(db, "inventory", id), {
+        name: product.name,
+        unit: product.unit,
+        amount: newTotal
+    }, { merge: true });
 
-    if (newAmount < 0) {
-        alert("Помилка: Недостатньо залишку!");
-        return;
-    }
-
-    await updateDoc(itemRef, { amount: newAmount });
-
-    // Запис логу операції
+    // Записуємо в історію (для звітів)
     await addDoc(collection(db, "history"), {
+        positionId: id,
+        change: change,
+        type: type,
+        time: serverTimestamp()
+    });
+}
+
+// Заповнення списку для форми поставки (автопідбір)
+const nameSelect = document.getElementById('new-name-select');
+if(nameSelect) {
+    PRODUCT_CATALOG.forEach(item => {
+        let opt = document.createElement('option');
+        opt.value = item.id;
+        opt.innerHTML = item.name;
+        nameSelect.appendChild(opt);
+    });
+}
         positionId: id,
         change: change,
         type: type,
