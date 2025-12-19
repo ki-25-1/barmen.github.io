@@ -30,6 +30,28 @@
 </form>
             </details>
         </section>
+        <section class="reports-container">
+    <div class="report-header">
+        <h2>Звіт за зміну</h2>
+        <input type="date" id="report-date-picker">
+        <button id="btn-generate-report" class="btn-restock">Сформувати звіт</button>
+    </div>
+    
+    <div id="report-results" class="hidden">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Товар</th>
+                    <th>Продано (всього)</th>
+                    <th>Тип операції</th>
+                </tr>
+            </thead>
+            <tbody id="report-body">
+                </tbody>
+        </table>
+    </div>
+        </section>
+        
 
         <main class="inventory">
             <table>
