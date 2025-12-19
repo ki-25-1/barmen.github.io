@@ -157,5 +157,69 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
 });
 
 // ... (інший код handleAction та onSnapshot залишається)
+import { 
+    query, where, getDocs, Timestamp 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// Встановлюємо сьогоднішню дату за замовчуванням у пікер
+const datePicker = document.getElementById('report-date-picker');
+datePicker.valueAsDate = new Date();
+
+document.getElementById('btn-generate-report').addEventListener('click', async () => {
+    const selectedDate = new Date(datePicker.value);
+    
+    // Встановлюємо часові межі: початок дня (00:00) та кінець дня (23:59)
+    const startOfDay = new Date(selectedDate.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(selectedDate.setHours(23, 59, 59, 999));
+
+    const historyRef = collection(db, "history");
+    const q = query(
+        historyRef, 
+        where("time", ">=", Timestamp.fromDate(startOfDay)),
+        where("time", "<=", Timestamp.fromDate(endOfDay))
+    );
+
+    const querySnapshot = await getDocs(q);
+    const reportData = {};
+
+    querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const pid = data.positionId;
+
+        if (!reportData[pid]) {
+            // Знаходимо назву з нашого каталогу
+            const prodInfo = PRODUCT_CATALOG.find(p => p.id === pid) || { name: "Невідомий товар" };
+            reportData[pid] = { name: prodInfo.name, total: 0 };
+        }
+        
+        // Додаємо тільки від'ємні значення (продажі)
+        if (data.type === 'sale') {
+            reportData[pid].total += Math.abs(data.change);
+        }
+    });
+
+    displayReport(reportData);
+});
+
+function displayReport(data) {
+    const reportBody = document.getElementById('report-body');
+    const reportDiv = document.getElementById('report-results');
+    reportBody.innerHTML = '';
+
+    if (Object.keys(data).length === 0) {
+        reportBody.innerHTML = '<tr><td colspan="3" style="text-align:center;">За цей день продажів не знайдено</td></tr>';
+    } else {
+        for (const id in data) {
+            const row = `
+                <tr>
+                    <td>${data[id].name}</td>
+                    <td><strong>${data[id].total.toFixed(3)}</strong></td>
+                    <td><span style="color:red;">Списання</span></td>
+                </tr>`;
+            reportBody.insertAdjacentHTML('beforeend', row);
+        }
+    }
+    reportDiv.classList.remove('hidden');
+}
 
       
