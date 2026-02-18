@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bar Manager Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', sans-serif; }
+        .card { margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; border-radius: 12px; }
+        .btn-xl { padding: 18px; font-size: 1.3rem; width: 100%; font-weight: bold; border-radius: 10px; }
+        .search-box { border: 2px solid #0d6efd; border-radius: 8px; padding: 12px; font-size: 1.1rem; }
+        #reportTable { width: 100%; border-collapse: collapse; background: white; font-family: 'Courier New', monospace; font-size: 14px; }
+        #reportTable th, #reportTable td { border: 1px solid #000; padding: 6px; }
+        .history-sale { color: #dc3545; font-weight: bold; }
+        .history-supply { color: #198754; font-weight: bold; }
+        .print-header { display: none; }
+        
+        /* Екран логіна */
+        #login-screen { display: flex; align-items: center; justify-content: center; height: 100vh; }
+        #main-app { display: none; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #pills-report, #pills-report * { visibility: visible; }
+            #pills-report { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+            .print-header { display: flex !important; justify-content: space-between; margin-bottom: 15px; font-weight: bold; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="card p-4 shadow" style="width: 100%; max-width: 400px;">
+        <h3 class="text-center mb-4">🔐 Вхід у Bar Manager</h3>
+        <div class="mb-3">
+            <label>Email закладу:</label>
+            <input type="email" id="loginEmail" class="form-control" placeholder="напр. fontan@bar.com">
+        </div>
+        <div class="mb-3">
+            <label>Пароль:</label>
+            <input type="password" id="loginPass" class="form-control" placeholder="******">
+        </div>
+        <button id="loginBtn" class="btn btn-primary w-100 py-2">УВІЙТИ</button>
+    </div>
+</div>
+
+<div id="main-app" class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <h2 id="venueTitle">🍺 Bar Manager</h2>
+        <button id="logoutBtn" class="btn btn-outline-secondary btn-sm">Вийти</button>
+    </div>
+
+    <ul class="nav nav-pills mb-3 justify-content-center no-print" id="pills-tab" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pills-sale">💰 Продаж</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-supply">🚚 Поставка</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-history">📜 Історія</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-report">📄 Звіт</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-add">➕ Товар</button></li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="pills-sale">
+            <div class="card p-4">
+                <div class="mb-3">
+                    <label>🔍 Пошук товару:</label>
+                    <input list="productsList" id="saleSearch" class="form-control search-box" placeholder="Почніть вводити назву...">
+                    <input type="hidden" id="saleProductId">
+                    <small id="saleHint" class="text-primary fw-bold"></small>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label>Кількість:</label>
+                        <div class="input-group">
+                            <input type="number" step="0.001" id="saleAmount" class="form-control form-control-lg">
+                            <span class="input-group-text" id="saleUnit">од</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label>Акцизний код:</label>
+                        <input type="text" id="exciseCode" class="form-control form-control-lg" placeholder="Сканувати...">
+                    </div>
+                </div>
+                <button id="btnProcessSale" class="btn btn-danger btn-xl">ПРОДАТИ</button>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-supply">
+            <div class="card p-4">
+                <div class="mb-3">
+                    <label>🔍 Товар для поставки:</label>
+                    <input list="productsList" id="supplySearch" class="form-control search-box">
+                    <input type="hidden" id="supplyProductId">
+                </div>
+                <div class="mb-3">
+                    <label>Кількість:</label>
+                    <div class="input-group">
+                        <input type="number" step="0.001" id="supplyAmount" class="form-control form-control-lg">
+                        <span class="input-group-text" id="supplyUnit">од</span>
+                    </div>
+                </div>
+                <button id="btnProcessSupply" class="btn btn-success btn-xl">ДОДАТИ НА СКЛАД</button>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-history">
+            <div class="card p-3">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>Час</th><th>Дія</th><th>Товар</th><th>К-сть</th><th>Акциз</th></tr></thead>
+                        <tbody id="historyBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-report">
+            <div class="d-flex justify-content-between mb-3 no-print">
+                <h4>Залишки</h4>
+                <button onclick="window.print()" class="btn btn-primary">🖨️ Друк звіту</button>
+            </div>
+            <div class="print-header">
+                <span id="printVenueName">заклад</span>
+                <span id="reportDate"></span>
+            </div>
+            <table id="reportTable">
+                <thead><tr><th>Код</th><th>Назва</th><th>Од.</th><th>Залишок</th><th class="no-print">Дії</th></tr></thead>
+                <tbody id="reportBody"></tbody>
+            </table>
+        </div>
+
+        <div class="tab-pane fade" id="pills-add">
+            <div class="card p-4">
+                <div class="row">
+                    <div class="col-md-6 mb-2"><label>Код:</label><input type="text" id="newCode" class="form-control"></div>
+                    <div class="col-md-6 mb-2"><label>Назва:</label><input type="text" id="newName" class="form-control"></div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-6"><label>Одиниця:</label><select id="newUnit" class="form-select"><option value="л">Літри</option><option value="шт">Штуки</option></select></div>
+                    <div class="col-6"><label>Порція:</label><input type="number" step="0.001" id="newDefaultPortion" class="form-control" value="0.5"></div>
+                </div>
+                <div class="mb-3"><label>Початковий залишок:</label><input type="number" step="0.001" id="newStartQty" class="form-control" value="0"></div>
+                <button id="btnAddNew" class="btn btn-dark w-100 py-3">ЗБЕРЕГТИ ТОВАР</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<datalist id="productsList"></datalist>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyCJN7"+"KqO8IspyiaASFW_P"+"jx0qOHBerZgNs",
+        authDomain: "barmen-2dc9a.firebaseapp.com",
+        databaseURL: "https://barmen-2dc9a-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "barmen-2dc9a",
+        storageBucket: "barmen-2dc9a.firebasestorage.app",
+        messagingSenderId: "49838"+"6875489",
+        appId: "1:49838"+"6875489:web:df2b"+"395329240"+"a6a542620",
+        measurementId: "G-CK2Q"+"5HQ87Y"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let currentVenue = "";
+    let allProducts = [];
+    let unsubProducts, unsubLogs;
+
+    // --- ЛОГІКА ВХОДУ ---
+    document.getElementById('loginBtn').onclick = () => {
+        const email = document.getElementById('loginEmail').value;
+        const pass = document.getElementById('loginPass').value;
+        signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Помилка: " + e.message));
+    };
+
+    document.getElementById('logoutBtn').onclick = () => signOut(auth);
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            // Визначаємо назву закладу з email (напр. fontan@bar.com -> FONTAN)
+            currentVenue = user.email.split('@')[0].toUpperCase();
+            document.getElementById('venueTitle').innerText = `📍 Заклад: ${currentVenue}`;
+            document.getElementById('printVenueName').innerText = currentVenue;
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            startSystem();
+        } else {
+            document.getElementById('login-screen').style.display = 'flex';
+            document.getElementById('main-app').style.display = 'none';
+            if (unsubProducts) unsubProducts();
+            if (unsubLogs) unsubLogs();
+        }
+    });
+
+    function startSystem() {
+        const productsCol = collection(db, `products_${currentVenue}`);
+        const logsCol = collection(db, `logs_${currentVenue}`);
+
+        // Слухаємо товари
+        unsubProducts = onSnapshot(productsCol, (snapshot) => {
+            allProducts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            updateInterface();
+        });
+
+        // Слухаємо логи
+        unsubLogs = onSnapshot(query(logsCol, orderBy("timestamp", "desc"), limit(50)), (snap) => {
+            const hb = document.getElementById('historyBody');
+            hb.innerHTML = '';
+            snap.forEach(d => {
+                const data = d.data();
+                const date = data.timestamp ? data.timestamp.toDate().toLocaleString('uk-UA', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : '...';
+                hb.innerHTML += `<tr><td>${date}</td><td>${data.type === 'sale' ? '<span class="history-sale">Продаж</span>' : '<span class="history-supply">Поставка</span>'}</td><td>${data.productName}</td><td>${data.amount}</td><td><small>${data.exciseCode}</small></td></tr>`;
+            });
+        });
+
+        // Прив'язка кнопок
+        document.getElementById('btnProcessSale').onclick = () => processTransaction('sale', productsCol, logsCol);
+        document.getElementById('btnProcessSupply').onclick = () => processTransaction('supply', productsCol, logsCol);
+        document.getElementById('btnAddNew').onclick = () => addNewProduct(productsCol);
+    }
+
+    function updateInterface() {
+        const datalist = document.getElementById('productsList');
+        const reportBody = document.getElementById('reportBody');
+        datalist.innerHTML = ''; reportBody.innerHTML = '';
+        
+        allProducts.sort((a,b) => b.quantity - a.quantity).forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.name;
+            datalist.appendChild(opt);
+
+            reportBody.innerHTML += `<tr><td>${p.code || '-'}</td><td>${p.name}</td><td>${p.unit}</td><td><b>${p.quantity.toFixed(3)}</b></td><td class="no-print"><button class="btn btn-sm btn-outline-danger" onclick="deleteProduct('${p.id}', '${p.name}')">🗑️</button></td></tr>`;
+        });
+    }
+
+    // Пошук
+    const setupSearch = (type) => {
+        document.getElementById(type + 'Search').oninput = (e) => {
+            const product = allProducts.find(p => p.name === e.target.value);
+            if (product) {
+                document.getElementById(type + 'ProductId').value = product.id;
+                document.getElementById(type + 'Unit').innerText = product.unit;
+                if (type === 'sale') {
+                    document.getElementById('saleAmount').value = product.defaultPortion;
+                    document.getElementById('saleHint').innerText = `Залишок: ${product.quantity.toFixed(3)}`;
+                }
+            }
+        };
+    };
+    setupSearch('sale'); setupSearch('supply');
+
+    async function processTransaction(type, pCol, lCol) {
+        const id = document.getElementById(type + 'ProductId').value;
+        const amount = parseFloat(document.getElementById(type + 'Amount').value);
+        if (!id || isNaN(amount)) return alert("Оберіть товар!");
+
+        const product = allProducts.find(p => p.id === id);
+        const newQty = (product.quantity || 0) + (type === 'sale' ? -amount : amount);
+
+        await updateDoc(doc(db, pCol.id, id), { quantity: newQty });
+        await addDoc(lCol, { productName: product.name, type, amount, exciseCode: document.getElementById('exciseCode')?.value || "N/A", timestamp: serverTimestamp() });
+        
+        document.getElementById(type + 'Search').value = "";
+        document.getElementById(type + 'Amount').value = "";
+        alert("Оновлено!");
+    }
+
+    async function addNewProduct(pCol) {
+        const name = document.getElementById('newName').value;
+        const portion = parseFloat(document.getElementById('newDefaultPortion').value);
+        if (!name) return alert("Назва порожня!");
+        await addDoc(pCol, { 
+            name, 
+            code: document.getElementById('newCode').value, 
+            unit: document.getElementById('newUnit').value, 
+            defaultPortion: portion, 
+            quantity: parseFloat(document.getElementById('newStartQty').value) || 0 
+        });
+        alert("Додано!");
+    }
+
+    window.deleteProduct = async (id, name) => {
+        if (confirm(`Видалити ${name}?`)) {
+            const pColId = `products_${currentVenue}`;
+            await deleteDoc(doc(db, pColId, id));
+        }
+    };
+
+    document.getElementById('reportDate').innerText = new Date().toLocaleDateString('uk-UA');
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
