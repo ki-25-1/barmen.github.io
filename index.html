@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bar Manager Pro</title>
+    <title>Pyatnicya grup</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body { background-color: #f4f6f9; font-family: 'Segoe UI', sans-serif; }
         .card { margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; border-radius: 12px; }
@@ -16,7 +17,6 @@
         .history-supply { color: #198754; font-weight: bold; }
         .print-header { display: none; }
         
-        /* Екран логіна */
         #login-screen { display: flex; align-items: center; justify-content: center; height: 100vh; }
         #main-app { display: none; }
 
@@ -33,7 +33,7 @@
 
 <div id="login-screen">
     <div class="card p-4 shadow" style="width: 100%; max-width: 400px;">
-        <h3 class="text-center mb-4">🔐 Вхід у Bar Manager</h3>
+        <h3 class="text-center mb-4">🔐 П'ятниця Груп</h3>
         <div class="mb-3">
             <label>Email закладу:</label>
             <input type="email" id="loginEmail" class="form-control" placeholder="напр. fontan@bar.com">
@@ -117,7 +117,7 @@
 
         <div class="tab-pane fade" id="pills-report">
             <div class="d-flex justify-content-between mb-3 no-print">
-                <h4>Залишки</h4>
+                <h4>Залишки на складі</h4>
                 <button onclick="window.print()" class="btn btn-primary">🖨️ Друк звіту</button>
             </div>
             <div class="print-header">
@@ -154,15 +154,14 @@
     import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+    // ВАШ КОНФІГ FIREBASE
     const firebaseConfig = {
-        apiKey: "AIzaSyCJN7"+"KqO8IspyiaASFW_P"+"jx0qOHBerZgNs",
+        apiKey: "AIzaSyCJN7KqO8IspyiaASFW_Pjx0qOHBerZgNs",
         authDomain: "barmen-2dc9a.firebaseapp.com",
-        databaseURL: "https://barmen-2dc9a-default-rtdb.europe-west1.firebasedatabase.app",
         projectId: "barmen-2dc9a",
         storageBucket: "barmen-2dc9a.firebasestorage.app",
-        messagingSenderId: "49838"+"6875489",
-        appId: "1:49838"+"6875489:web:df2b"+"395329240"+"a6a542620",
-        measurementId: "G-CK2Q"+"5HQ87Y"
+        messagingSenderId: "498386875489",
+        appId: "1:498386875489:web:df2b395329240a6a542620"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -173,20 +172,33 @@
     let allProducts = [];
     let unsubProducts, unsubLogs;
 
-    // --- ЛОГІКА ВХОДУ ---
+    // --- ГАРНІ ПОВІДОМЛЕННЯ (TOAST) ---
+    const showToast = (message, icon = 'success') => {
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2500,
+            timerProgressBar: true
+        });
+        Toast.fire({ icon: icon, title: message });
+    };
+
+    // --- АВТОРИЗАЦІЯ ---
     document.getElementById('loginBtn').onclick = () => {
         const email = document.getElementById('loginEmail').value;
         const pass = document.getElementById('loginPass').value;
-        signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Помилка: " + e.message));
+        signInWithEmailAndPassword(auth, email, pass)
+            .then(() => showToast("Вхід успішний!"))
+            .catch(e => Swal.fire("Помилка входу", "Невірний email або пароль", "error"));
     };
 
     document.getElementById('logoutBtn').onclick = () => signOut(auth);
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
-            // Визначаємо назву закладу з email (напр. fontan@bar.com -> FONTAN)
             currentVenue = user.email.split('@')[0].toUpperCase();
-            document.getElementById('venueTitle').innerText = `📍 Заклад: ${currentVenue}`;
+            document.getElementById('venueTitle').innerText = `П'ятниця Груп | ${currentVenue}`;
             document.getElementById('printVenueName').innerText = currentVenue;
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('main-app').style.display = 'block';
@@ -203,13 +215,11 @@
         const productsCol = collection(db, `products_${currentVenue}`);
         const logsCol = collection(db, `logs_${currentVenue}`);
 
-        // Слухаємо товари
         unsubProducts = onSnapshot(productsCol, (snapshot) => {
             allProducts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
             updateInterface();
         });
 
-        // Слухаємо логи
         unsubLogs = onSnapshot(query(logsCol, orderBy("timestamp", "desc"), limit(50)), (snap) => {
             const hb = document.getElementById('historyBody');
             hb.innerHTML = '';
@@ -220,7 +230,6 @@
             });
         });
 
-        // Прив'язка кнопок
         document.getElementById('btnProcessSale').onclick = () => processTransaction('sale', productsCol, logsCol);
         document.getElementById('btnProcessSupply').onclick = () => processTransaction('supply', productsCol, logsCol);
         document.getElementById('btnAddNew').onclick = () => addNewProduct(productsCol);
@@ -236,11 +245,11 @@
             opt.value = p.name;
             datalist.appendChild(opt);
 
-            reportBody.innerHTML += `<tr><td>${p.code || '-'}</td><td>${p.name}</td><td>${p.unit}</td><td><b>${p.quantity.toFixed(3)}</b></td><td class="no-print"><button class="btn btn-sm btn-outline-danger" onclick="deleteProduct('${p.id}', '${p.name}')">🗑️</button></td></tr>`;
+            reportBody.innerHTML += `<tr><td>${p.code || '-'}</td><td>${p.name}</td><td>${p.unit}</td><td><b>${p.quantity.toFixed(3)}</b></td><td class="no-print"><button class="btn btn-sm btn-outline-danger" onclick="confirmDelete('${p.id}', '${p.name}')">🗑️</button></td></tr>`;
         });
     }
 
-    // Пошук
+    // Пошук товару
     const setupSearch = (type) => {
         document.getElementById(type + 'Search').oninput = (e) => {
             const product = allProducts.find(p => p.name === e.target.value);
@@ -249,7 +258,7 @@
                 document.getElementById(type + 'Unit').innerText = product.unit;
                 if (type === 'sale') {
                     document.getElementById('saleAmount').value = product.defaultPortion;
-                    document.getElementById('saleHint').innerText = `Залишок: ${product.quantity.toFixed(3)}`;
+                    document.getElementById('saleHint').innerText = `Залишок: ${product.quantity.toFixed(3)} ${product.unit}`;
                 }
             }
         };
@@ -259,38 +268,61 @@
     async function processTransaction(type, pCol, lCol) {
         const id = document.getElementById(type + 'ProductId').value;
         const amount = parseFloat(document.getElementById(type + 'Amount').value);
-        if (!id || isNaN(amount)) return alert("Оберіть товар!");
+        if (!id || isNaN(amount)) return Swal.fire("Увага", "Оберіть товар зі списку!", "warning");
 
         const product = allProducts.find(p => p.id === id);
         const newQty = (product.quantity || 0) + (type === 'sale' ? -amount : amount);
 
-        await updateDoc(doc(db, pCol.id, id), { quantity: newQty });
-        await addDoc(lCol, { productName: product.name, type, amount, exciseCode: document.getElementById('exciseCode')?.value || "N/A", timestamp: serverTimestamp() });
-        
-        document.getElementById(type + 'Search').value = "";
-        document.getElementById(type + 'Amount').value = "";
-        alert("Оновлено!");
+        try {
+            await updateDoc(doc(db, `products_${currentVenue}`, id), { quantity: newQty });
+            await addDoc(lCol, { productName: product.name, type, amount, exciseCode: document.getElementById('exciseCode')?.value || "N/A", timestamp: serverTimestamp() });
+            
+            showToast(type === 'sale' ? "Продано успішно" : "Склад оновлено");
+            document.getElementById(type + 'Search').value = "";
+            document.getElementById(type + 'Amount').value = "";
+            if (type === 'sale') document.getElementById('exciseCode').value = "";
+        } catch (e) {
+            Swal.fire("Помилка", e.message, "error");
+        }
     }
 
     async function addNewProduct(pCol) {
         const name = document.getElementById('newName').value;
         const portion = parseFloat(document.getElementById('newDefaultPortion').value);
-        if (!name) return alert("Назва порожня!");
-        await addDoc(pCol, { 
-            name, 
-            code: document.getElementById('newCode').value, 
-            unit: document.getElementById('newUnit').value, 
-            defaultPortion: portion, 
-            quantity: parseFloat(document.getElementById('newStartQty').value) || 0 
-        });
-        alert("Додано!");
+        if (!name || isNaN(portion)) return Swal.fire("Помилка", "Заповніть назву та порцію", "error");
+
+        try {
+            await addDoc(pCol, { 
+                name, 
+                code: document.getElementById('newCode').value, 
+                unit: document.getElementById('newUnit').value, 
+                defaultPortion: portion, 
+                quantity: parseFloat(document.getElementById('newStartQty').value) || 0 
+            });
+            showToast("Товар додано в базу");
+            document.getElementById('newName').value = "";
+            document.getElementById('newCode').value = "";
+        } catch (e) {
+            Swal.fire("Помилка", e.message, "error");
+        }
     }
 
-    window.deleteProduct = async (id, name) => {
-        if (confirm(`Видалити ${name}?`)) {
-            const pColId = `products_${currentVenue}`;
-            await deleteDoc(doc(db, pColId, id));
-        }
+    window.confirmDelete = (id, name) => {
+        Swal.fire({
+            title: 'Видалити товар?',
+            text: `Ви впевнені, що хочете видалити "${name}"?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Так, видалити!',
+            cancelButtonText: 'Скасувати'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                await deleteDoc(doc(db, `products_${currentVenue}`, id));
+                showToast("Товар видалено", "info");
+            }
+        });
     };
 
     document.getElementById('reportDate').innerText = new Date().toLocaleDateString('uk-UA');
